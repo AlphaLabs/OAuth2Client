@@ -1,0 +1,30 @@
+{
+    "name": "alphalabs/oauth2-client",
+    "description": "A PHP OAuth2 API client. Works well with friendofsymfony/oauth2-php specification.",
+    "keywords": ["oauth2","api", "client"],
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Sylvain Mauduit",
+            "email": "swop@swop.io"
+        }
+    ],
+
+    "require": {
+        "php": ">=5.3.3",
+        "guzzle/guzzle": "*"
+    },
+    "suggest": {
+        "jms/serializer": "Allows advance deserialization of response to target objects"
+    },
+    "minimum-stability": "stable",
+    "autoload": {
+        "psr-0": { "AlphaLabs\\OAuth2Client\\": "src/" }
+    },
+    "extra": {
+        "branch-alias": {
+            "dev-master": "1.0-dev"
+        }
+    }
+}
