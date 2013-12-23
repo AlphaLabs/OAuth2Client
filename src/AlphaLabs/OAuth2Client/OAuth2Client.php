@@ -37,6 +37,8 @@ class OAuth2Client
 {
     const REQUEST_MAX_TRY = 1;
 
+    /** @var Client name */
+    private $name;
     /** @var Client HTTP client */
     private $httpClient;
     /** @var string OAuth2 client id */
@@ -59,6 +61,7 @@ class OAuth2Client
     /**
      * Constructor
      *
+     * @param string       $name                  Client name
      * @param string       $apiBaseUrl            API base url
      * @param string       $clientId              Client identifier
      * @param string       $clientSecret          Client secret key
@@ -67,6 +70,7 @@ class OAuth2Client
      * @param string       $format                API request/response format (default: json)
      */
     public function __construct(
+        $name,
         $apiBaseUrl,
         $clientId,
         $clientSecret,
@@ -74,6 +78,7 @@ class OAuth2Client
         $accessTokenRequestUri,
         $format = 'json'
     ) {
+        $this->name                  = $name;
         $this->httpClient            = new Client($apiBaseUrl);
         $this->clientId              = $clientId;
         $this->clientSecret          = $clientSecret;
@@ -175,7 +180,7 @@ class OAuth2Client
             $userId = $request->getUserId();
 
             if (!array_key_exists($userId, $this->userTokens)) {
-                $token = $this->tokenManager->getUserToken($userId);
+                $token = $this->tokenManager->getUserToken($this->name, $userId);
 
                 if ($token instanceof Token) {
                     $this->userTokens[$userId] = $token;
@@ -187,7 +192,7 @@ class OAuth2Client
             return $token;
         } elseif ($request instanceof ClientRequest) {
             if (!$this->clientToken instanceof Token) {
-                $this->clientToken = $this->tokenManager->getClientToken();
+                $this->clientToken = $this->tokenManager->getClientToken($this->name);
 
                 if (is_null($this->clientToken)) {
                     $this->requestAccessToken($request);
@@ -218,7 +223,7 @@ class OAuth2Client
 
         $this->clientToken = $this->buildToken($this->send($request));
 
-        $this->tokenManager->save($this->clientToken);
+        $this->tokenManager->save($this->name, $this->clientToken);
     }
 
     /**
@@ -255,16 +260,30 @@ class OAuth2Client
 
         $request = new RefreshTokenRequest($this->accessTokenRequestUri, $token->getRefreshToken());
 
-        $newToken = $this->buildToken($this->send($request));
+        try {
+            $retreivedToken = $this->send($request);
 
-        if ($initialRequest instanceof UserRequest) {
-            $newToken->setUserId($initialRequest->getUserId());
-            $this->userTokens[$initialRequest->getUserId()] = $newToken;
-        } elseif ($initialRequest instanceof ClientRequest) {
-            $this->clientToken = $newToken;
+            $newToken = $this->buildToken($retreivedToken);
+
+            if ($initialRequest instanceof UserRequest) {
+                $newToken->setUserId($initialRequest->getUserId());
+                $this->userTokens[$initialRequest->getUserId()] = $newToken;
+            } elseif ($initialRequest instanceof ClientRequest) {
+                $this->clientToken = $newToken;
+            }
+
+            $this->tokenManager->save($this->name, $newToken);
+
+        } catch (BadResponseException $e) {
+            if ($e->getResponse()->isClientError()) {
+                // If the server respond with an unauthorized status code, we assumes that the given refresh code
+                // is expired or invalid. The current token is cleared and we try to get a new token
+
+                $this->requestAccessToken($initialRequest);
+            } else {
+                throw $e;
+            }
         }
-
-        $this->tokenManager->save($newToken);
     }
 
     /**

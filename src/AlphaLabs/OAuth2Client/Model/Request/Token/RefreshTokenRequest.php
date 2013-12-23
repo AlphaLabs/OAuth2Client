@@ -31,9 +31,9 @@ class RefreshTokenRequest extends TokenRequest
      */
     public function __construct($uri, $refreshToken, $method = 'POST')
     {
-        parent::__construct($uri, $method);
-
         $this->refreshToken = $refreshToken;
+
+        parent::__construct($uri, $method);
     }
 
     /**

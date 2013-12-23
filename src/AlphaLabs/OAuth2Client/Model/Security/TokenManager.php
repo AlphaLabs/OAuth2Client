@@ -25,25 +25,29 @@ interface TokenManager
     /**
      * Retrieve the current user-based API token, for user-oriented API calls usage.
      *
-     * @param int $userId
+     * @param string $clientName
+     * @param int    $userId
      *
      * @return Token|null
      */
-    public function getUserToken($userId);
+    public function getUserToken($clientName, $userId);
 
     /**
      * Retrieve the current client-based token, for client credentials API calls usage.
      *
+     * @param string $clientName
+     *
      * @return Token|null
      */
-    public function getClientToken();
+    public function getClientToken($clientName);
 
     /**
      * Save the updated token
      *
-     * @param Token $token
+     * @param string $clientName
+     * @param Token  $token
      *
      * @return mixed
      */
-    public function save(Token $token);
+    public function save($clientName, Token $token);
 }

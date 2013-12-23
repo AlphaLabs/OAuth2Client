@@ -38,21 +38,21 @@ use AlphaLabs\OAuth2Client\Model\Security\TokenManager;
 
 class MyTokenManager implements TokenManager
 {
-    public function getUserToken($userId) {
+    public function getUserToken($clientName, $userId) {
         // Retrieve the token linked to the user (for user-oriented API calls).
         // It could be stored in a database, a cache file etc ...
 
         return $token;
     }
 
-    public function getClientToken() {
+    public function getClientToken($clientName) {
         // Retrieve the token linked to the client (for client-oriented API calls).
         // It could be stored in a database, a cache file etc ...
 
         return $token;
     }
 
-    public function save(Token $token) {
+    public function save($clientName, Token $token) {
         // The type of token (user/client) could be determined with the userId attribute value:
         if ($token->getUserId()) {
             // This is a user-related token
@@ -79,6 +79,7 @@ class MyClass
     public function foo()
     {
         $apiClient = new OAuth2Client(
+            'my_api_client'                 // Client name
             'https://api.myproject.com',    // Base API URL
             'my_client_id',                 // The client ID (provided by the API)
             'my_client_secret',             // The client secret key (provided by the API)
