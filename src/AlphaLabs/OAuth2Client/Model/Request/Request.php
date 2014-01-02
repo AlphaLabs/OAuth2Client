@@ -33,12 +33,14 @@ abstract class Request
     private $options;
     /** @var string Fully classified class name of the target object */
     private $deserializationTargetClass;
+    /** @var callable Callback called after the response was deserialized */
+    private $postDeserializationCallback;
 
     /**
      * @param string $method
      * @param string $uri
      */
-    public function __construct($method, $uri)
+    public function __construct($method = 'GET', $uri = '/')
     {
         $this->method  = $method;
         $this->uri     = $uri;
@@ -143,6 +145,34 @@ abstract class Request
     }
 
     /**
+     * Sets the uri attribute
+     *
+     * @param string $uri
+     *
+     * @return $this
+     */
+    public function setUri($uri)
+    {
+        $this->uri = $uri;
+
+        return $this;
+    }
+
+    /**
+     * Sets the method attribute
+     *
+     * @param string $method
+     *
+     * @return $this
+     */
+    public function setMethod($method)
+    {
+        $this->method = $method;
+
+        return $this;
+    }
+
+    /**
      * Gets the uri attribute
      *
      * @return string
@@ -177,5 +207,29 @@ abstract class Request
         $this->deserializationTargetClass = $deserializationTargetClass;
 
         return $this;
+    }
+
+    /**
+     * Sets the postDeserialization callback
+     *
+     * @param callable $postDeserializationCallback
+     *
+     * @return $this
+     */
+    public function setPostDeserializationCallback(callable $postDeserializationCallback)
+    {
+        $this->postDeserializationCallback = $postDeserializationCallback;
+
+        return $this;
+    }
+
+    /**
+     * Gets the postDeserialization callback
+     *
+     * @return callable
+     */
+    public function getPostDeserializationCallback()
+    {
+        return $this->postDeserializationCallback;
     }
 }

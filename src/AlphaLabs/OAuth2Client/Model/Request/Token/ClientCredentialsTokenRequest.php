@@ -19,7 +19,7 @@ namespace AlphaLabs\OAuth2Client\Model\Request\Token;
  *
  * @author  Sylvain Mauduit <swop@swop.io>
  */
-class ClientCredentialsTokenRequest extends TokenRequest
+class ClientCredentialsTokenRequest extends ClientTokenRequest
 {
     /**
      * {@inheritDoc}

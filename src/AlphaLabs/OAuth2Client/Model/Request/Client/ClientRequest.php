@@ -10,7 +10,7 @@
 
 namespace AlphaLabs\OAuth2Client\Model\Request\Client;
 
-use AlphaLabs\OAuth2Client\Model\Request\Request;
+use AlphaLabs\OAuth2Client\Model\Request\ResourceRequest;
 
 /**
  * API Client-oriented Request.
@@ -21,6 +21,6 @@ use AlphaLabs\OAuth2Client\Model\Request\Request;
  *
  * @author  Sylvain Mauduit <swop@swop.io>
  */
-class ClientRequest extends Request
+class ClientRequest extends ResourceRequest
 {
 }

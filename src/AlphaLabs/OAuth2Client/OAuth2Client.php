@@ -15,6 +15,7 @@ use AlphaLabs\OAuth2Client\Model\Request\Token\RefreshTokenRequest;
 use AlphaLabs\OAuth2Client\Exception\RequestMaxTryException;
 use AlphaLabs\OAuth2Client\Model\Request\Client\ClientRequest;
 use AlphaLabs\OAuth2Client\Model\Request\Request;
+use AlphaLabs\OAuth2Client\Model\Request\ResourceRequest;
 use AlphaLabs\OAuth2Client\Model\Request\Token\ClientCredentialsTokenRequest;
 use AlphaLabs\OAuth2Client\Model\Request\Token\TokenRequest;
 use AlphaLabs\OAuth2Client\Model\Request\User\UserRequest;
@@ -39,6 +40,8 @@ class OAuth2Client
 
     /** @var Client name */
     private $name;
+    /** @var string API base URL */
+    private $baseUrl;
     /** @var Client HTTP client */
     private $httpClient;
     /** @var string OAuth2 client id */
@@ -79,6 +82,7 @@ class OAuth2Client
         $format = 'json'
     ) {
         $this->name                  = $name;
+        $this->baseUrl               = $apiBaseUrl;
         $this->httpClient            = new Client($apiBaseUrl);
         $this->clientId              = $clientId;
         $this->clientSecret          = $clientSecret;
@@ -103,18 +107,29 @@ class OAuth2Client
      */
     public function send(Request $request, $tryCount = 0)
     {
-        $guzzleRequest = $this->httpClient->createRequest(
-            $request->getMethod(),
-            $request->getUri(),
-            $request->getHeaders(),
-            $request->getBody(),
-            $request->getOptions()
-        );
+        if ($request instanceof TokenRequest) {
+            return $this->sendTokenRequest($request);
+        } elseif (!$request instanceof ResourceRequest) {
+            throw new \InvalidArgumentException(
+                'The request to send must extends TokenRequest or ResourceRequest class.'
+            );
+        }
 
-        $this->addAuthorization($request, $guzzleRequest);
+        $token = $this->retrieveAdaptedToken($request);
+
+        $guzzleRequest = $this->buildGuzzleRequestFromRequest($request)
+            ->setAuth(null)
+            ->setHeader('Authorization', 'Bearer ' . $token->getAccessToken());
 
         try {
-            $guzzleRequest->send();
+            $response = $guzzleRequest->send();
+
+            return $this->deserialize(
+                $response,
+                $request->getDeserializationTargetClass(),
+                $request->getPostDeserializationCallback()
+            );
+
         } catch (BadResponseException $e) {
             if ($tryCount == self::REQUEST_MAX_TRY) {
                 $exception = new RequestMaxTryException('Maximun request try reached.', 0, $e);
@@ -122,42 +137,50 @@ class OAuth2Client
                 throw $exception;
             }
 
-            if (!$request instanceof TokenRequest && $e->getResponse()->getStatusCode() == 401) {
-                // If the request was a resource request (not an acces token request) and the server respond
-                // with an unauthorized status code, we assumes that the given access code is expired.
+            if ($e->getResponse()->getStatusCode() == 401) {
+                // If the server respond with an unauthorized status code,
+                // we assumes that the given access token is expired.
+                // We'll try to renew the access token based on the refresh token
 
-                $this->refreshAccessToken($request);
+                $this->requestAccessToken(
+                    new RefreshTokenRequest(
+                        $token->getRefreshToken(),
+                        $token->getUserId()
+                    )
+                );
 
+                // Then the previous request is replayed.
                 return $this->send($request, $tryCount + 1);
             }
 
+            // If the exception doesn't match any previous case, it is thrown again.
             throw $e;
         }
-
-        $response = $guzzleRequest->getResponse();
-
-        $responseData = $this->deserialize($response, $request->getDeserializationTargetClass());
-
-        return $responseData;
     }
 
-    /**
-     * Adds Authorization headers on the request
-     *
-     * @param Request                $request       Initial API request
-     * @param GuzzleRequestInterface $guzzleRequest Forged Guzzle request
-     */
-    private function addAuthorization(Request $request, GuzzleRequestInterface $guzzleRequest)
+    private function sendTokenRequest(TokenRequest $request)
     {
-        if ($request instanceof TokenRequest) {
-            $guzzleRequest->setAuth($this->clientId, $this->clientSecret);
-        } elseif ($request instanceof UserRequest || $request instanceof ClientRequest) {
-            $guzzleRequest->setAuth(null);
+        $guzzleRequest = $this->buildGuzzleRequestFromRequest($request);
+        $guzzleRequest->setAuth($this->clientId, $this->clientSecret);
 
-            $token = $this->getToken($request);
+        $response = $guzzleRequest->send();
 
-            $guzzleRequest->setHeader('Authorization', 'Bearer ' . $token->getAccessToken());
-        }
+        return $this->deserialize(
+            $response,
+            $request->getDeserializationTargetClass(),
+            $request->getPostDeserializationCallback()
+        );
+    }
+
+    private function buildGuzzleRequestFromRequest(Request $request)
+    {
+        return $this->httpClient->createRequest(
+            $request->getMethod(),
+            $request->getUri(),
+            $request->getHeaders(),
+            $request->getBody(),
+            $request->getOptions()
+        );
     }
 
     /**
@@ -171,119 +194,86 @@ class OAuth2Client
      *
      * @throws Exception\UserAuthenticationRequiredException If no User access token was previously stored.
      *
-     * @return null|Token
+     * @return Token
      */
-    private function getToken(Request $request)
+    private function retrieveAdaptedToken(ResourceRequest $request)
     {
         if ($request instanceof UserRequest) {
-            $token = null;
             $userId = $request->getUserId();
 
-            if (!array_key_exists($userId, $this->userTokens)) {
-                $token = $this->tokenManager->getUserToken($this->name, $userId);
-
-                if ($token instanceof Token) {
-                    $this->userTokens[$userId] = $token;
-                } else {
-                    throw new UserAuthenticationRequiredException();
-                }
+            if (null === $token = $this->getUserToken($userId)) {
+                throw new UserAuthenticationRequiredException();
             }
-
-            return $token;
         } elseif ($request instanceof ClientRequest) {
-            if (!$this->clientToken instanceof Token) {
-                $this->clientToken = $this->tokenManager->getClientToken($this->name);
+            if (null === $token = $this->getClientToken()) {
+                $this->requestAccessToken(
+                    new ClientCredentialsTokenRequest()
+                );
 
-                if (is_null($this->clientToken)) {
-                    $this->requestAccessToken($request);
-                }
+                $token = $this->clientToken;
             }
-
-            return $this->clientToken;
+        } else {
+            throw \LogicException('The ResourceRequests must extends ClientRequest or UserRequest classes');
         }
 
-        return null;
+        return $token;
     }
 
-    /**
-     * Try to request a fresh new Access token.
-     *
-     * @param Request $initialRequest Initial request. Used to get the request type to request the new token with an
-     *                                adapted grant type.
-     *
-     * @throws \LogicException If an access token request is made from a non ClientRequest initial request
-     */
-    private function requestAccessToken(Request $initialRequest)
+    public function requestAccessToken(TokenRequest $tokenRequest)
     {
-        if (!$initialRequest instanceof ClientRequest) {
-            throw new \LogicException('A new request access token must be initiated for client-credentials grants only');
-        }
-
-        $request = new ClientCredentialsTokenRequest($this->accessTokenRequestUri);
-
-        $this->clientToken = $this->buildToken($this->send($request));
-
-        $this->tokenManager->save($this->name, $this->clientToken);
-    }
-
-    /**
-     * Try to request a new Access token, by using the current refresh token.
-     *
-     * @param Request $initialRequest Initial request. Used to get the request type to request the new token with an
-     *                                adapted grant type.
-     *
-     * @throws \RuntimeException If no current Token object is available
-     */
-    private function refreshAccessToken(Request $initialRequest)
-    {
-        $token = null;
-
-        if ($initialRequest instanceof UserRequest) {
-            $userId = $initialRequest->getUserId();
-
-            if (!array_key_exists($userId, $this->userTokens)) {
-                throw new \RuntimeException('Current token must exists to be refreshed.');
-            }
-
-            $token = $this->userTokens[$userId];
-        } elseif ($initialRequest instanceof ClientRequest) {
-            if (!$this->clientToken instanceof Token) {
-                throw new \RuntimeException('Current token must exists to be refreshed.');
-            }
-
-            $token = $this->clientToken;
-        }
-
-        if (!$token instanceof Token) {
-            throw new \RuntimeException('Current token must exists to be refreshed.');
-        }
-
-        $request = new RefreshTokenRequest($this->accessTokenRequestUri, $token->getRefreshToken());
+        $tokenRequest->setUri($this->accessTokenRequestUri);
 
         try {
-            $retreivedToken = $this->send($request);
-
-            $newToken = $this->buildToken($retreivedToken);
-
-            if ($initialRequest instanceof UserRequest) {
-                $newToken->setUserId($initialRequest->getUserId());
-                $this->userTokens[$initialRequest->getUserId()] = $newToken;
-            } elseif ($initialRequest instanceof ClientRequest) {
-                $this->clientToken = $newToken;
-            }
-
-            $this->tokenManager->save($this->name, $newToken);
-
-        } catch (BadResponseException $e) {
-            if ($e->getResponse()->isClientError()) {
-                // If the server respond with an unauthorized status code, we assumes that the given refresh code
-                // is expired or invalid. The current token is cleared and we try to get a new token
-
-                $this->requestAccessToken($initialRequest);
-            } else {
-                throw $e;
-            }
+            $token = $this->buildToken($this->send($tokenRequest));
+        } catch (\Guzzle\Http\Exception\BadResponseException $e) {
+            throw $e;
         }
+
+        if ($token->isUserToken()) {
+            $this->userTokens[$token->getUserId()] = $token;
+        } else {
+            $this->clientToken = $token;
+        }
+
+        $this->tokenManager->save($this->name, $token);
+    }
+
+    /**
+     * Gets the curent client token
+     *
+     * @return Token|null
+     */
+    public function getClientToken()
+    {
+        if (!$this->clientToken instanceof Token) {
+            $this->clientToken = $this->tokenManager->getClientToken($this->name);
+        }
+
+        return $this->clientToken;
+    }
+
+    /**
+     * Gets the current token of the given user
+     *
+     * @param int $userId
+     *
+     * @return Token|null
+     */
+    public function getUserToken($userId)
+    {
+        if (!array_key_exists($userId, $this->userTokens)) {
+            $token = $this->tokenManager->getUserToken($this->name, $userId);
+
+            if ($token instanceof Token) {
+                $this->userTokens[$userId] = $token;
+            } else {
+                $token = null;
+            }
+        } else {
+            $token = $this->userTokens[$userId];
+        }
+
+        return $token;
     }
 
     /**
@@ -327,7 +317,7 @@ class OAuth2Client
      *
      * @return mixed
      */
-    private function deserialize(GuzzleResponse $response, $targetClassNS = null)
+    private function deserialize(GuzzleResponse $response, $targetClassNS = null, $postDeserializationCallback = null)
     {
         if (!is_null($this->serializer) && !is_null($targetClassNS)) {
             $responseData = $this->serializer->deserialize(
@@ -337,6 +327,10 @@ class OAuth2Client
             );
         } else {
             $responseData = json_decode($response->getBody(true), true);
+        }
+
+        if (null !== $postDeserializationCallback) {
+            $postDeserializationCallback($responseData);
         }
 
         return $responseData;
@@ -359,5 +353,15 @@ class OAuth2Client
         $this->serializer = $serializer;
 
         return $this;
+    }
+
+    /**
+     * Gets the baseUrl attribute
+     *
+     * @return string
+     */
+    public function getBaseUrl()
+    {
+        return $this->baseUrl;
     }
 }

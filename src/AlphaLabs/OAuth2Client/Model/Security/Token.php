@@ -199,4 +199,14 @@ class Token
     {
         return $this->userId;
     }
+
+    /**
+     * Checks if the token is a user-related token
+     *
+     * @return bool
+     */
+    public function isUserToken()
+    {
+        return null !== $this->userId;
+    }
 }

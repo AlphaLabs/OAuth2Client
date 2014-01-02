@@ -10,6 +10,8 @@
 
 namespace AlphaLabs\OAuth2Client\Model\Request\Token;
 
+use AlphaLabs\OAuth2Client\Model\Security\Token;
+
 /**
  * API Access token request, with refresh_token grant.
  *
@@ -29,11 +31,17 @@ class RefreshTokenRequest extends TokenRequest
      *
      * @param string $refreshToken Refresh token
      */
-    public function __construct($uri, $refreshToken, $method = 'POST')
+    public function __construct($refreshToken, $userId = null, $method = 'POST', $uri = '/')
     {
         $this->refreshToken = $refreshToken;
 
-        parent::__construct($uri, $method);
+        parent::__construct($method, $uri);
+
+        if (null !== $userId) {
+            $this->setPostDeserializationCallback(function (Token $token) use ($userId) {
+                $token->setUserId($userId);
+            });
+        }
     }
 
     /**

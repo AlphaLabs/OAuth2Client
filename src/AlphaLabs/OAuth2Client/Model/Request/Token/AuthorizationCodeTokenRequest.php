@@ -19,7 +19,7 @@ namespace AlphaLabs\OAuth2Client\Model\Request\Token;
  *
  * @author  Sylvain Mauduit <swop@swop.io>
  */
-class AuthorizationCodeTokenRequest extends TokenRequest
+class AuthorizationCodeTokenRequest extends UserTokenRequest
 {
     /** @var string */
     private $authCode;
@@ -33,12 +33,12 @@ class AuthorizationCodeTokenRequest extends TokenRequest
      * @param string $redirectUri Optional redirect URI. The URI is optional but can be required by the server,
      *                            depending on the security strategy.
      */
-    public function __construct($uri, $authCode, $redirectUri = null, $method = 'POST')
+    public function __construct($authCode, $userId, $redirectUri = null)
     {
-        parent::__construct($uri, $method);
-
         $this->authCode    = $authCode;
         $this->redirectUri = $redirectUri;
+
+        parent::__construct($userId);
     }
 
     /**

@@ -20,7 +20,7 @@ namespace AlphaLabs\OAuth2Client\Model\Request\Token;
  *
  * @author  Sylvain Mauduit <swop@swop.io>
  */
-class UserCredentialsTokenRequest extends TokenRequest
+class UserCredentialsTokenRequest extends UserTokenRequest
 {
     /** @var string User name */
     private $username;
@@ -33,12 +33,12 @@ class UserCredentialsTokenRequest extends TokenRequest
      * @param string $username User login
      * @param string $password User password
      */
-    public function __construct($uri, $username, $password, $method = 'POST')
+    public function __construct($username, $password, $userId)
     {
-        parent::__construct($uri, $method);
-
         $this->username = $username;
         $this->password = $password;
+
+        parent::__construct($userId);
     }
 
     /**

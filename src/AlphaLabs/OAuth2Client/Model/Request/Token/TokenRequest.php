@@ -29,7 +29,7 @@ abstract class TokenRequest extends Request
      * @param string $uri
      * @param string $method
      */
-    public function __construct($uri, $method = 'POST')
+    public function __construct($method = 'POST', $uri = '/')
     {
         parent::__construct($method, $uri);
 

@@ -10,7 +10,7 @@
 
 namespace AlphaLabs\OAuth2Client\Model\Request\User;
 
-use AlphaLabs\OAuth2Client\Model\Request\Request;
+use AlphaLabs\OAuth2Client\Model\Request\ResourceRequest;
 
 /**
  * API User-oriented Request.
@@ -22,7 +22,7 @@ use AlphaLabs\OAuth2Client\Model\Request\Request;
  *
  * @author  Sylvain Mauduit <swop@swop.io>
  */
-class UserRequest extends Request
+class UserRequest extends ResourceRequest
 {
     /** @var int Related user id */
     private $userId;
