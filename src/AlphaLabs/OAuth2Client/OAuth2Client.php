@@ -24,7 +24,6 @@ use AlphaLabs\OAuth2Client\Model\Security\TokenManager;
 
 use Guzzle\Http\Client;
 use Guzzle\Http\Exception\BadResponseException;
-use Guzzle\Http\Message\RequestInterface as GuzzleRequestInterface;
 use Guzzle\Http\Message\Response as GuzzleResponse;
 
 /**
