@@ -13,7 +13,7 @@
 
     "require": {
         "php": ">=5.3.3",
-        "guzzle/guzzle": "*"
+        "guzzle/guzzle": "~3.7"
     },
     "suggest": {
         "jms/serializer": "Allows advance deserialization of response to target objects"
