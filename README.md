@@ -1,5 +1,7 @@
 # AlphaLabs OAuth2 client
 
+[![Latest Stable Version](https://poser.pugx.org/alphalabs/oauth2-client/v/stable.png)](https://packagist.org/packages/alphalabs/oauth2-client) [![Latest Unstable Version](https://poser.pugx.org/alphalabs/oauth2-client/v/unstable.png)](https://packagist.org/packages/alphalabs/oauth2-client) [![SensioLabsInsight](https://insight.sensiolabs.com/projects/fdbb8b9b-14b6-4d31-adf3-c66d0f7e8746/mini.png)](https://insight.sensiolabs.com/projects/fdbb8b9b-14b6-4d31-adf3-c66d0f7e8746)
+
 > A PHP OAuth2 API client. Works well with friendofsymfony/oauth2-php specification
 
 This library is build over [Guzzle](https://github.com/guzzle/guzzle) and adds OAuth2 authentication mechanisms to make secured and user-oriented API calls.
